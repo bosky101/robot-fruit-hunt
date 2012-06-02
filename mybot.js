@@ -3,7 +3,6 @@
  */
 var bot;
 var BOT = function(_board){
-    bot.log('new bot');
     var _this = this;
     _this.board = _board;
 };
@@ -12,87 +11,77 @@ BOT.refresh = function(){
     
     bot = new BOT(get_board());
     bot.log('REFRESH');
-    
-    // first direction determined by most valuable fruit
-    /*var x_start, x_end;
-    if(bot.isOnLeft()){
-	bot.next.x = bot.x();x_end = bot.x();
-    }else{
-	x_start = bot.x();x_end = WIDTH;
-    }
-    var y_start, y_end;
-    if(bot.isOnLeft()){
-	y_start = 0;y_end = bot.y();
-    }else{
-	y_start = bot.y();y_end = HEIGHT;
-    }
-    var startWithX = (x_start < y_start ) ? 'x':'y'; 
-    bot.log('X: move from '+x_start+' to '+ x_end);
-    bot.log('Y: move from '+y_start+' to '+ y_end);
-    bot.log('startWithDirection: '+ startWithX);
-    */
-
-    var _area = WIDTH*HEIGHT;
-    var numberOfGrids = _area/9;
-    bot.log('grids: ',numberOfGrids,' for wxh: ',WIDTH,HEIGHT);
-    
+  
     //TODO: interchange width/height based on direction above
     var i=1,j=1,cont=1;
     bot.grid = [];bot.sorted=[];
     while(cont){
 	bot.log('find points for radar: ',i,j,' =>');
 	var pts = bot.getPointsForRadar(i,j);
-	var _items=0,item_pts=[]
+	var _items=WIDTH*HEIGHT,item_pts=[];
+	var first_done=0;
 	for(var _pt in pts){
 	    var pt = pts[_pt];
-	    //bot.log(' pt',pt.x,',',pt.y);	
 	    if(bot.board[pt.x]){
 		var _found = has_item(bot.board[pt.x][pt.y]);
 		if(_found){
 		    bot.log('bot.board['+pt.x+']['+pt.y+'] has item! => ',has_item(bot.board[pt.x][pt.y]));
-		    _items+=1;
+		    //_items+=1;
+		    var _type = bot.board[pt.x][pt.y];
+		    var _delta = get_total_item_count(_type)  ;
+		    bot.log('there are only '+ _delta+' of type '+_type,' when centre at ',i,',',j ,' pts ',pts);
+		    //_items+= _delta;
+		    
+		    _items = (_delta < _items) ? (first_done<4)?_delta:_items:_items;
+		    first_done++;
+		    if(_delta==1){
+			bot.log('\tthis should be first,_items is ', _items); 
+		    }
 		    item_pts.push({x:pt.x,y:pt.y});
 		}
 	    }
 	}
+	//item_pts = item_pts.reverse();
 	if(_items){
-	    bot.log('range bot.board['+i+']['+j+'] has '+_items+' items!');
+	    //bot.log('range bot.board['+i+']['+j+'] has '+_items+' items!');
 	}
 	
-	bot.grid.push( {key:i+','+j, x:i, y:j, value:_items, pts:pts, items:item_pts}); 
+	bot.grid.push( {key:i+','+j, x:i, y:j, val:_items, pts:pts, items:item_pts}); 
 	
 	if(i>WIDTH-1){
-	    i=1;j+=1;
+	    i=1;j+=3;
 	}else{
-	    i+=2;
+	    i+=3;
 	}
 	if(j>HEIGHT){
 	    bot.log('stop');
 	    cont=false;
 	}
     }
-    bot.grid=bot.grid.sort( function(a,b){return (b.value) - (a.value);});
+    bot.grid=bot.grid.sort( function(a,b){
+	return (a.val) - (b.val);
+    });
     
     for(var obj in bot.grid){
 	var toadd = [];
 	var pt = bot.grid[obj];
-	bot.log('bot.board['+pt.key+'] has '+pt.value+' items!',pt.items);
-	for(var _pt in pt.items){
-	    var temppt = pt.items[_pt];
-	    temppt.value = pt.value;
-	    temppt.key = temppt.x+','+temppt.y;
-	    if(!bot.hash[temppt.key]){
-		toadd.push(temppt);
-		bot.hash[temppt.key]=1;
-	   }	
+	bot.log('bot.board['+pt.key+'] has ',pt.val,' items!',pt.items);
+	if(pt.items.length > 0){
+	    for(var _pt in pt.items){
+		var temppt = pt.items[_pt];
+		temppt.val = pt.val;
+		temppt.key = temppt.x+','+temppt.y;
+		if(!bot.hash[temppt.key]){
+		    toadd.push(temppt);
+		    bot.hash[temppt.key]=1;
+		}	
+	    }
+	    bot.todo = bot.todo.concat(toadd);
 	}
-	bot.todo = bot.todo.concat(toadd);
     }
-
-    for(var _pt in bot.todo){
-	var pt = bot.todo[_pt];
-	bot.log('move to ',pt.x,pt.y,' => ',pt.value+' =>'+ has_item(bot.board[pt.x][pt.y]));
-    }
+    
+    bot.print();
+    
     if(bot.todo[0]){
 	bot.log('bot is at ',bot.x(),bot.y(),' move to',bot.todo[0].key);
     }
@@ -126,16 +115,24 @@ BOT.prototype = {
 	    var next_x = x - ( radar - a); 
 	    for(var b=0;b<=2*radar;b++){
 		var next_y = y + ( radar - b);
-		temp.push({x:next_x,y:next_y});
+		var _row = {x:next_x,y:next_y};
+		if(next_x>=WIDTH){ 
+		    next_x=WIDTH-1;
+		}
+		if(next_y>=HEIGHT){
+		    next_y=HEIGHT-1;
+		}
+		var _type = this.board[next_x][next_y];
+		if(_type){
+		    var _delta = get_total_item_count(_type);
+		    _row.val=_delta;
+		}else{
+		    _row.val=WIDTH*HEIGHT;
+		}
+		temp.push(_row);
 	    }
 	}
-
-	/*for(var i=x-1;i>0 && i<=WIDTH && i< radar;i++){
-	    for(var j=y-1;j>0 && j<=HEIGHT && <radar;j++){
-		bot.log('i,j => ',i,j);
-		temp.push({x:i,y:j});
-	    }
-	}*/
+	temp = temp.sort(function(a,b){ return a.val - b.val;});
 	return temp;
     },
     log: function(){
@@ -144,28 +141,85 @@ BOT.prototype = {
 	}
     },
     pop: function(x,y,_lost){
+	
 	var _this = this;
+	var _first = _this.todo[0]; 
+	var nextunsorted=[];
+	var cont=true,resort=false,_change=_first.val;
+	for(var i=1;i<_this.todo.length && cont;i++){
+	    if(_change!=_this.todo[i].val){
+		cont=false;resort=_this.todo[i].val;
+		console.log('\tchange since ',_first.val,' != ',_this.todo[i].val);
+		continue;
+	    }
+	}
+	
 	if(!x){
-	    var _first = _this.todo[0];
 	    var _removed = _this.todo.shift();
-	    bot.log('\t'+_first,' == ',_removed , ' so removed to give next as ', _this.todo[0]);
+	    //bot.log('\t'+_first,' == ',_removed , ' so removed to give next as ', _this.todo[0]);
 	}else{
 	    if(_lost){
-		bot.log('\topponent took over ',x,y);
+		//bot.log('\topponent took over ',x,y);
 	    }
 	    var temp=[],_found=[],_todo=_this.todo;
 	    for(var _pt in _todo){
 		var pt = _todo[_pt];
 		if(pt.x == x && pt.y == y){
 		    _found.push(_pt);
+		    bot.log('\topponent took over ',x,y);
 		}else{
 		    temp.push(pt);
 		}
+		if(resort==pt.val){
+		    nextunsorted.push(pt);
+		}
 	    }
+	    
 	    if(temp.length){
 		bot.log('\tstumbled on ',x,y,' so todo reduces from ',_this.todo.length,' to ',temp.length,' at indexes ',_found,' in ',_this.todo);
 		_this.todo = temp;
 	    }
+	}
+
+	if(resort){
+	    _this.print('before nextunsorted is ',nextunsorted);
+	    var nextresorted = nextunsorted.sort( function(a,b){
+		if(a.val == resort){
+		    //console.log('resort: ',resort, b.x+b.y,a.x+a.y,'=>',a,b);
+		    return (a.x-b.x) + (a.y-b.y);
+		}else{
+		    return false;
+		}
+	    });
+	    
+	    _this.print('after nextunsorted is ',nextresorted);
+	   
+	    for(var i=0,j=0;i<_this.todo.length;i++){
+		if(_this.todo[i].val == resort){
+		    console.log('\t\t',_this.todo[i],' j = ',j,' in ',nextresorted);
+		    console.log('\tsubstitute ',_this.todo[i].x,_this.todo[i].y,' with [',j,'] ',nextresorted[j].x,nextresorted[j].y);
+		    j++;
+		    //_this.todo[i] = nextresorted.shift();
+		}
+	    }
+	    console.log('bot is at ',_this.x(),_this.y(),' resort is ',resort);
+	    
+	    _this.print('todo is ');
+	}
+    },
+    print: function(msg,_array,FORCELOG){
+	var _msg = (msg)?msg+': ':'';
+	_array = (_array)? _array:this.todo; 
+	for(var _pt in _array){
+	    var pt = _array[_pt];
+	    var _log;
+	    if(FORCELOG){
+		_log = console.log;
+	    }else{
+		_log = bot.log
+	    }
+	    _log(_msg+'move to ',pt.x,pt.y,' => ',pt.val+' =>'+ has_item(bot.board[pt.x][pt.y]));
+	    
 	}
     }
 };
@@ -193,7 +247,7 @@ function make_move() {
 
     // we found an item! take it!
     if (has_item(board[get_my_x()][get_my_y()]) > 0) {
-	bot.log('\tFOUND next item at ', bot.x(),bot.y(),' remove ',_target.x,_target.y);
+	//bot.log('\tFOUND next item at ', bot.x(),bot.y(),' remove ',_target.x,_target.y);
 	if(_target.x == get_my_x() && _target.y == get_my_y()){
 	    bot.pop();
 	}else{
@@ -207,7 +261,6 @@ function make_move() {
 	bot.pop(get_opponent_x(),get_opponent_y(),true);
     }
 
-    bot.log('diffs for x,y are ',x_diff , y_diff);
     var check_y = function(){
 	if(_target.y > bot.y()){
 	    bot.log(message+': move down');
@@ -217,7 +270,7 @@ function make_move() {
 		bot.log(message+': move up');
 		return NORTH;
 	    }else{
-		bot.log(message+': y is same, check x?');
+		bot.log('\t'+message+': y is same, check x?');
 		return check_x();
 	    }
 	}
@@ -231,7 +284,7 @@ function make_move() {
 		bot.log(message+': both x are same, so do y');
 		if(_target.y == bot.y()){
 		    bot.log(message+': too late, skip ',bot.todo[0].key);
-		    bot.pop();make_move();
+		    bot.pop();return make_move();
 		}else{
 		    return check_y();
 		}
@@ -247,12 +300,4 @@ function make_move() {
 	return check_y();
     }
 
-   var rand = Math.random() * 4;
-
-   if (rand < 1) return NORTH;
-   if (rand < 2) return SOUTH;
-   if (rand < 3) return EAST;
-   if (rand < 4) return WEST;
-
-   return PASS;
 }
