@@ -6,6 +6,18 @@ var GamePlay = {
         $('.forward').bind('click', function() { Board.processMove(); GamePlay.draw();});
         $('.newgame').bind('click', function() { GamePlay.setupNewGame();});
         $('.reset').bind('click', function() { Board.reset();});
+        $('#set_board').bind('click', function() { GamePlay.setBoardNumber();});
+        $('#board_number').bind('keyup', function(e) { if(e.keyCode == 13) {GamePlay.setBoardNumber();}});
+
+        $('#check_breadcrumbs').click(function(evt) {
+          if (evt.srcElement.checked) {
+            GamePlay.show_breadcrumbs = true;
+          } else {
+            GamePlay.show_breadcrumbs = false;
+          }
+        });
+
+        GamePlay.show_breadcrumbs = false;
         var itemImageUrls = ["assets/images/FruitApple.png", "assets/images/FruitBanana.png", "assets/images/FruitCherry.png", "assets/images/FruitMelon.png", "assets/images/FruitOrange.png"];
         GamePlay.itemImages = new Array();
         for (var i=0; i<itemImageUrls.length; i++) {
@@ -17,12 +29,40 @@ var GamePlay = {
         GamePlay.player_one_image.src = "assets/images/FruitBlueBot.png";
         GamePlay.player_two_image = new Image();
         GamePlay.player_two_image.src = "assets/images/FruitPurpleBot.png";
+        GamePlay.visitedImg = new Image();
+        GamePlay.visitedImg.src = "assets/images/FruitCellVisited.png";
+        GamePlay.bothVisitedImg = new Image();
+        GamePlay.bothVisitedImg.src = "assets/images/FruitCellVisitedBoth.png";
+        GamePlay.oppVisitedImg = new Image();
+        GamePlay.oppVisitedImg.src = "assets/images/FruitCellOppVisited.png";
         GamePlay.itemImages[itemImageUrls.length - 1].onload = function(){
             GamePlay.setupNewGame();
-        }
+        };
+
     },
-    setupNewGame: function() {
-        Board.init();
+    setupNewGame: function(boardNumber) {
+        // Create a new board setup according to the following priority:
+        // 
+        // 1. If a board number is passed in, use that.
+        // 2. If the bot has default_board_number() defined, use that.
+        // 3. Generate a random board number.
+        var nextBoardNum;
+
+        if(boardNumber === undefined) {
+            if ( typeof default_board_number == 'function' && !isNaN(parseInt(default_board_number()))) {
+                nextBoardNum = default_board_number()
+            } else {
+                Math.seedrandom();
+                nextBoardNum = Math.min(Math.floor(Math.random() * 999999), 999999);
+            }
+        } else {
+            nextBoardNum = boardNumber;
+        }
+
+        $('#board_number').val(nextBoardNum);
+
+        Board.init(nextBoardNum);
+
         Board.newGame();
         GamePlay.itemTypeCount = get_number_of_item_types();
         document.getElementById('grid').width = GamePlay.itemTypeCount * 50 + WIDTH * 50;
@@ -41,7 +81,7 @@ var GamePlay = {
     draw: function() {
         var ctx = GamePlay.canvas.getContext('2d');
         ctx.clearRect(0,0,GamePlay.canvas.width,GamePlay.canvas.height);
-        GamePlay.drawItems(ctx, Board.board);
+        GamePlay.drawItems(ctx, Board.board, Board.history);
         GamePlay.drawPlayerTwo(ctx, Board.board);
         GamePlay.drawPlayerOne(ctx, Board.board);
         GamePlay.displayScore(ctx, Board.board);
@@ -115,13 +155,29 @@ var GamePlay = {
     drawPlayerTwo: function(ctx, state) {
         ctx.drawImage(GamePlay.player_two_image, GamePlay.itemTypeCount * 50 + Board.oppX * 50 - 2, Board.oppY * 50 - 2);
     },
-    drawItems: function(ctx, state) {
+    drawItems: function(ctx, state, history) {
         for (var i=0; i<WIDTH; i++) {
             for (var j=0; j<HEIGHT; j++) {
                 if (state[i][j] !== 0) {
                     ctx.drawImage(GamePlay.itemImages[state[i][j] - 1], GamePlay.itemTypeCount * 50 + i * 50, j * 50);
+                } else if (GamePlay.show_breadcrumbs && history[i][j]==1) {
+                    ctx.drawImage(GamePlay.visitedImg, GamePlay.itemTypeCount * 50 + i * 50, j * 50);
+                } else if (GamePlay.show_breadcrumbs && history[i][j]==2) {
+                    ctx.drawImage(GamePlay.oppVisitedImg, GamePlay.itemTypeCount * 50 + i * 50, j * 50);
+                } else if (GamePlay.show_breadcrumbs && history[i][j]==3) {
+                    ctx.drawImage(GamePlay.bothVisitedImg, GamePlay.itemTypeCount * 50 + i * 50, j * 50);
                 }
             }
+        }
+    },
+    setBoardNumber: function() {
+        var boardNumber;
+
+        boardNumber = parseInt($('#board_number').val());
+        if (!isNaN(boardNumber)) {
+            GamePlay.setupNewGame(boardNumber);
+        } else {
+            GamePlay.setupNewGame();
         }
     }
 }
